@@ -2,10 +2,7 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
-const Customer = require('../models/Customer');
-const { getDbStatus } = require('../config/db');
-const mockDb = require('../config/mockDb');
+const { db } = require('../config/db');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key_123';
 
@@ -19,44 +16,12 @@ router.post('/login', async (req, res) => {
   }
 
   try {
-    let user;
-
-    if (getDbStatus()) {
-      // Use mock database
-      user = mockDb.users.find(u => u.username.toLowerCase() === username.toLowerCase());
-    } else {
-      // Use MongoDB database
-      user = await User.findOne({ username: new RegExp(`^${username}$`, 'i') });
-
-      // Auto-seed default admins on first login attempt if database is fresh
-      const targetUser = username.toLowerCase();
-      if (!user && (targetUser === 'admin' || targetUser === 'rajaricetraders01@gmail.com')) {
-        const adminCount = await User.countDocuments();
-        if (adminCount === 0) {
-          const salt = await bcrypt.genSalt(10);
-          const hashedPassword = await bcrypt.hash('admin123', salt);
-          
-          // Seed standard admin
-          const standardAdmin = new User({
-            username: 'admin',
-            password: hashedPassword
-          });
-          await standardAdmin.save();
-
-          // Seed Gmail admin
-          const gmailAdmin = new User({
-            username: 'rajaricetraders01@gmail.com',
-            password: hashedPassword
-          });
-          await gmailAdmin.save();
-
-          console.log('🌱 Automatically seeded default admin users (admin & rajaricetraders01@gmail.com) into live MongoDB.');
-          
-          // Re-query user
-          user = await User.findOne({ username: new RegExp(`^${username}$`, 'i') });
-        }
-      }
-    }
+    const userRes = await db.execute({
+      sql: 'SELECT * FROM users WHERE LOWER(username) = ?',
+      args: [username.toLowerCase()]
+    });
+    
+    const user = userRes.rows[0];
 
     if (!user) {
       return res.status(400).json({ message: 'Invalid credentials' });
@@ -69,13 +34,13 @@ router.post('/login', async (req, res) => {
     }
 
     // Sign JWT Token
-    const payload = { id: user._id || user.id, username: user.username };
+    const payload = { id: user.id, username: user.username };
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '1d' });
 
     res.json({
       token,
       user: {
-        id: user._id || user.id,
+        id: user.id,
         username: user.username
       }
     });
@@ -99,42 +64,26 @@ router.post('/register', async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    if (getDbStatus()) {
-      // Check if user exists in mock
-      const exists = mockDb.users.some(u => u.username.toLowerCase() === username.toLowerCase());
-      if (exists) {
-        return res.status(400).json({ message: 'User already exists' });
-      }
+    // Check if user exists in SQLite
+    const existsRes = await db.execute({
+      sql: 'SELECT * FROM users WHERE LOWER(username) = ?',
+      args: [username.toLowerCase()]
+    });
 
-      const newUser = {
-        _id: 'user_' + Date.now(),
-        username,
-        password: hashedPassword
-      };
-      mockDb.users.push(newUser);
-      
-      return res.status(201).json({
-        message: 'Admin registered successfully (Mock DB)',
-        user: { id: newUser._id, username: newUser.username }
-      });
-    } else {
-      // Check if user exists in MongoDB
-      const exists = await User.findOne({ username: new RegExp(`^${username}$`, 'i') });
-      if (exists) {
-        return res.status(400).json({ message: 'User already exists' });
-      }
-
-      const newUser = new User({
-        username,
-        password: hashedPassword
-      });
-
-      await newUser.save();
-      return res.status(201).json({
-        message: 'Admin registered successfully',
-        user: { id: newUser._id, username: newUser.username }
-      });
+    if (existsRes.rows.length > 0) {
+      return res.status(400).json({ message: 'User already exists' });
     }
+
+    const newId = 'user_' + Date.now();
+    await db.execute({
+      sql: 'INSERT INTO users (id, username, password) VALUES (?, ?, ?)',
+      args: [newId, username, hashedPassword]
+    });
+
+    return res.status(201).json({
+      message: 'Admin registered successfully',
+      user: { id: newId, username }
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error during registration' });
@@ -155,46 +104,26 @@ router.post('/customer/register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, salt);
     const emailLower = email.toLowerCase();
 
-    if (getDbStatus()) {
-      // Check if email already exists in mock
-      const exists = mockDb.customers.some(c => c.email.toLowerCase() === emailLower);
-      if (exists) {
-        return res.status(400).json({ message: 'Customer email already registered' });
-      }
+    // Mongoose DB check in SQLite
+    const existsRes = await db.execute({
+      sql: 'SELECT * FROM customers WHERE LOWER(email) = ?',
+      args: [emailLower]
+    });
 
-      const newCust = {
-        _id: 'cust_' + Date.now(),
-        name,
-        phone,
-        email: emailLower,
-        password: hashedPassword
-      };
-      mockDb.customers.push(newCust);
-
-      return res.status(201).json({
-        message: 'Customer registered successfully (Mock DB)',
-        user: { id: newCust._id, name: newCust.name, email: newCust.email }
-      });
-    } else {
-      // Mongoose DB check
-      const exists = await Customer.findOne({ email: emailLower });
-      if (exists) {
-        return res.status(400).json({ message: 'Customer email already registered' });
-      }
-
-      const newCust = new Customer({
-        name,
-        phone,
-        email: emailLower,
-        password: hashedPassword
-      });
-
-      await newCust.save();
-      return res.status(201).json({
-        message: 'Customer registered successfully',
-        user: { id: newCust._id, name: newCust.name, email: newCust.email }
-      });
+    if (existsRes.rows.length > 0) {
+      return res.status(400).json({ message: 'Customer email already registered' });
     }
+
+    const newId = 'cust_' + Date.now();
+    await db.execute({
+      sql: 'INSERT INTO customers (id, name, phone, email, password) VALUES (?, ?, ?, ?, ?)',
+      args: [newId, name, phone, emailLower, hashedPassword]
+    });
+
+    return res.status(201).json({
+      message: 'Customer registered successfully',
+      user: { id: newId, name, email: emailLower }
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error during customer registration' });
@@ -211,14 +140,13 @@ router.post('/customer/login', async (req, res) => {
   }
 
   try {
-    let customer;
     const emailLower = email.toLowerCase();
+    const customerRes = await db.execute({
+      sql: 'SELECT * FROM customers WHERE LOWER(email) = ?',
+      args: [emailLower]
+    });
 
-    if (getDbStatus()) {
-      customer = mockDb.customers.find(c => c.email.toLowerCase() === emailLower);
-    } else {
-      customer = await Customer.findOne({ email: emailLower });
-    }
+    const customer = customerRes.rows[0];
 
     if (!customer) {
       return res.status(400).json({ message: 'Invalid credentials' });
@@ -230,7 +158,7 @@ router.post('/customer/login', async (req, res) => {
     }
 
     const payload = { 
-      id: customer._id || customer.id, 
+      id: customer.id, 
       name: customer.name, 
       email: customer.email,
       phone: customer.phone,

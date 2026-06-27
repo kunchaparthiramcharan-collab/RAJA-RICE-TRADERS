@@ -1,12 +1,26 @@
 const express = require('express');
 const router = express.Router();
-const Product = require('../models/Product');
 const auth = require('../middleware/auth');
-const { getDbStatus } = require('../config/db');
-const mockDb = require('../config/mockDb');
+const { db } = require('../config/db');
 
-// Helper to generate IDs for mock data
-const generateMockId = () => 'prod_' + Math.random().toString(36).substr(2, 9);
+// Helper to format SQLite product row to the format expected by React frontend
+const formatProductRow = (row) => {
+  if (!row) return null;
+  return {
+    _id: row.id, // Map SQLite id to _id so frontend code works unmodified
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    category: row.category,
+    price: row.price,
+    packageSizes: JSON.parse(row.packageSizes),
+    imageUrl: row.imageUrl,
+    inStock: row.inStock === 1,
+    stockQuantity: row.stockQuantity,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+};
 
 // @route   GET /api/products
 // @desc    Get all products (with optional filtering and search)
@@ -14,22 +28,8 @@ router.get('/', async (req, res) => {
   const { category, search } = req.query;
 
   try {
-    let resultProducts = [];
-
-    if (getDbStatus()) {
-      // Fetch from Mock DB
-      resultProducts = [...mockDb.products];
-    } else {
-      // Fetch from MongoDB
-      const count = await Product.countDocuments();
-      if (count === 0) {
-        // Strip custom string _id for clean Mongoose auto-ObjectId generation
-        const productsToSeed = mockDb.products.map(({ _id, ...rest }) => rest);
-        await Product.insertMany(productsToSeed);
-        console.log('🌱 Automatically seeded default products catalog into live MongoDB.');
-      }
-      resultProducts = await Product.find().lean();
-    }
+    const productsRes = await db.execute('SELECT * FROM products ORDER BY category ASC, name ASC');
+    let resultProducts = productsRes.rows.map(formatProductRow);
 
     // Filter by category
     if (category && category !== 'All') {
@@ -58,13 +58,12 @@ router.get('/:id', async (req, res) => {
   const { id } = req.params;
 
   try {
-    let product;
+    const productRes = await db.execute({
+      sql: 'SELECT * FROM products WHERE id = ?',
+      args: [id]
+    });
 
-    if (getDbStatus()) {
-      product = mockDb.products.find(p => p._id === id);
-    } else {
-      product = await Product.findById(id);
-    }
+    const product = formatProductRow(productRes.rows[0]);
 
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });
@@ -87,36 +86,24 @@ router.post('/', auth, async (req, res) => {
   }
 
   try {
-    if (getDbStatus()) {
-      const newProduct = {
-        _id: generateMockId(),
-        name,
-        description,
-        category,
-        price: Number(price),
-        packageSizes: packageSizes || ["25kg"],
-        imageUrl: imageUrl || "https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&q=80&w=600",
-        inStock: inStock !== undefined ? inStock : true,
-        stockQuantity: stockQuantity !== undefined ? Number(stockQuantity) : 0,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      mockDb.products.push(newProduct);
-      return res.status(201).json(newProduct);
-    } else {
-      const newProduct = new Product({
-        name,
-        description,
-        category,
-        price: Number(price),
-        packageSizes: packageSizes || ["25kg"],
-        imageUrl: imageUrl || "https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&q=80&w=600",
-        inStock: inStock !== undefined ? inStock : true,
-        stockQuantity: stockQuantity !== undefined ? Number(stockQuantity) : 0
-      });
-      const savedProduct = await newProduct.save();
-      return res.status(201).json(savedProduct);
-    }
+    const newId = 'prod_' + Date.now();
+    const finalPackageSizes = JSON.stringify(packageSizes || ["25kg"]);
+    const finalImageUrl = imageUrl || "https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&q=80&w=600";
+    const finalInStock = (inStock !== undefined ? inStock : true) ? 1 : 0;
+    const finalStockQuantity = stockQuantity !== undefined ? Number(stockQuantity) : 0;
+
+    await db.execute({
+      sql: `INSERT INTO products (id, name, description, category, price, packageSizes, imageUrl, inStock, stockQuantity) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [newId, name, description, category, Number(price), finalPackageSizes, finalImageUrl, finalInStock, finalStockQuantity]
+    });
+
+    const productRes = await db.execute({
+      sql: 'SELECT * FROM products WHERE id = ?',
+      args: [newId]
+    });
+
+    return res.status(201).json(formatProductRow(productRes.rows[0]));
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error adding product' });
@@ -130,40 +117,46 @@ router.put('/:id', auth, async (req, res) => {
   const { id } = req.params;
 
   try {
-    if (getDbStatus()) {
-      const index = mockDb.products.findIndex(p => p._id === id);
-      if (index === -1) {
-        return res.status(404).json({ message: 'Product not found' });
-      }
+    // Check if exists
+    const checkRes = await db.execute({
+      sql: 'SELECT * FROM products WHERE id = ?',
+      args: [id]
+    });
 
-      const updated = {
-        ...mockDb.products[index],
-        name: name !== undefined ? name : mockDb.products[index].name,
-        description: description !== undefined ? description : mockDb.products[index].description,
-        category: category !== undefined ? category : mockDb.products[index].category,
-        price: price !== undefined ? Number(price) : mockDb.products[index].price,
-        packageSizes: packageSizes !== undefined ? packageSizes : mockDb.products[index].packageSizes,
-        imageUrl: imageUrl !== undefined ? imageUrl : mockDb.products[index].imageUrl,
-        inStock: inStock !== undefined ? inStock : mockDb.products[index].inStock,
-        stockQuantity: stockQuantity !== undefined ? Number(stockQuantity) : mockDb.products[index].stockQuantity,
-        updatedAt: new Date()
-      };
-      
-      mockDb.products[index] = updated;
-      return res.json(updated);
-    } else {
-      const updatedProduct = await Product.findByIdAndUpdate(
-        id,
-        { name, description, category, price, packageSizes, imageUrl, inStock, stockQuantity },
-        { new: true, runValidators: true }
-      );
-
-      if (!updatedProduct) {
-        return res.status(404).json({ message: 'Product not found' });
-      }
-
-      return res.json(updatedProduct);
+    const existingProduct = checkRes.rows[0];
+    if (!existingProduct) {
+      return res.status(404).json({ message: 'Product not found' });
     }
+
+    const finalName = name !== undefined ? name : existingProduct.name;
+    const finalDescription = description !== undefined ? description : existingProduct.description;
+    const finalCategory = category !== undefined ? category : existingProduct.category;
+    const finalPrice = price !== undefined ? Number(price) : existingProduct.price;
+    const finalPackageSizes = packageSizes !== undefined ? JSON.stringify(packageSizes) : existingProduct.packageSizes;
+    const finalImageUrl = imageUrl !== undefined ? imageUrl : existingProduct.imageUrl;
+    
+    let finalInStock;
+    if (inStock !== undefined) {
+      finalInStock = inStock ? 1 : 0;
+    } else {
+      finalInStock = existingProduct.inStock;
+    }
+
+    const finalStockQuantity = stockQuantity !== undefined ? Number(stockQuantity) : existingProduct.stockQuantity;
+
+    await db.execute({
+      sql: `UPDATE products 
+            SET name = ?, description = ?, category = ?, price = ?, packageSizes = ?, imageUrl = ?, inStock = ?, stockQuantity = ?, updated_at = CURRENT_TIMESTAMP 
+            WHERE id = ?`,
+      args: [finalName, finalDescription, finalCategory, finalPrice, finalPackageSizes, finalImageUrl, finalInStock, finalStockQuantity, id]
+    });
+
+    const updatedRes = await db.execute({
+      sql: 'SELECT * FROM products WHERE id = ?',
+      args: [id]
+    });
+
+    return res.json(formatProductRow(updatedRes.rows[0]));
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error updating product' });
@@ -176,21 +169,21 @@ router.delete('/:id', auth, async (req, res) => {
   const { id } = req.params;
 
   try {
-    if (getDbStatus()) {
-      const index = mockDb.products.findIndex(p => p._id === id);
-      if (index === -1) {
-        return res.status(404).json({ message: 'Product not found' });
-      }
-      mockDb.products.splice(index, 1);
-      return res.json({ message: 'Product removed successfully' });
-    } else {
-      const product = await Product.findById(id);
-      if (!product) {
-        return res.status(404).json({ message: 'Product not found' });
-      }
-      await product.deleteOne();
-      return res.json({ message: 'Product removed successfully' });
+    const checkRes = await db.execute({
+      sql: 'SELECT * FROM products WHERE id = ?',
+      args: [id]
+    });
+
+    if (checkRes.rows.length === 0) {
+      return res.status(404).json({ message: 'Product not found' });
     }
+
+    await db.execute({
+      sql: 'DELETE FROM products WHERE id = ?',
+      args: [id]
+    });
+
+    return res.json({ message: 'Product removed successfully' });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error deleting product' });

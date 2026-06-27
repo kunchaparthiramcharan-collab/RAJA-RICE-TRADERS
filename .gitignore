@@ -6,6 +6,8 @@
 **/dist/
 # Log files
 *.log
+*.db
+**/local.db
 # IDE files
 .vscode/
 .idea/
