@@ -1,0 +1,12 @@
+# Ignore node_modules in both folders
+**/node_modules/
+# Ignore secret environment variables
+**/.env
+# Ignore built files if needed (or keep them out of git)
+**/dist/
+# Log files
+*.log
+# IDE files
+.vscode/
+.idea/
+.gemini/
