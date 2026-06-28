@@ -2,7 +2,7 @@ import React from 'react';
 
 const WhatsAppButton = () => {
   // Configurable owner WhatsApp number (including country code, e.g. +91 for India)
-  const phoneNumber = '919876543210'; 
+  const phoneNumber = '919848223681'; 
   const message = encodeURIComponent('Hello Raja Rice Traders, I am interested in inquiring about your rice products. Please share more details.');
   const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
 

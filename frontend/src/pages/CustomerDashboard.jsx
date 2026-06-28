@@ -221,10 +221,10 @@ const CustomerDashboard = () => {
             </div>
           </div>
           <a 
-            href="tel:+919876543210" 
+            href="tel:+919848223681" 
             className="bg-[#2E7D32] hover:bg-[#1B5E20] text-white font-bold px-6 py-2.5 rounded-xl text-xs transition-colors"
           >
-            Call +91 98765 43210
+            Call +91 98482 23681
           </a>
         </div>
       </div>

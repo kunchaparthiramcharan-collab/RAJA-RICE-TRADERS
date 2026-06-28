@@ -113,7 +113,7 @@ const Contact = () => {
                 </div>
                 <div>
                   <h4 className="font-bold text-gray-900 text-sm">Call/WhatsApp</h4>
-                  <a href="tel:+919876543210" className="text-gray-600 hover:text-[#2E7D32] transition-colors text-sm mt-1 block">+91 98765 43210</a>
+                  <a href="tel:+919848223681" className="text-gray-600 hover:text-[#2E7D32] transition-colors text-sm mt-1 block">+91 98482 23681</a>
                   <span className="text-xs text-gray-400">Owner: Rajashekar</span>
                 </div>
               </div>
