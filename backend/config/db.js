@@ -67,6 +67,32 @@ const connectDB = async () => {
       )
     `);
 
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS password_resets (
+        id TEXT PRIMARY KEY,
+        email TEXT NOT NULL,
+        code TEXT NOT NULL,
+        expires_at DATETIME NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Alter users table to add email column if not exists
+    try {
+      await db.execute('ALTER TABLE users ADD COLUMN email TEXT');
+      console.log('✅ Added email column to users table.');
+    } catch (e) {
+      // Column already exists, ignore error
+    }
+
+    try {
+      await db.execute("UPDATE users SET email = 'rajaricetraders01@gmail.com' WHERE username = 'admin' AND (email IS NULL OR email = '')");
+      await db.execute("UPDATE users SET email = 'kunchaparthiramcharan@gmail.com' WHERE username = 'raju12' AND (email IS NULL OR email = '')");
+      console.log('✅ Updated admin email addresses in users table.');
+    } catch (e) {
+      console.error('⚠️ Error updating admin emails:', e.message);
+    }
+
     console.log('✅ SQLite/Turso tables checked/created successfully.');
 
     // 2. Auto-Seed Users if empty
@@ -78,14 +104,14 @@ const connectDB = async () => {
       
       // Standard admin
       await db.execute({
-        sql: 'INSERT INTO users (id, username, password) VALUES (?, ?, ?)',
-        args: ['user_admin', 'admin', adminHashed]
+        sql: 'INSERT INTO users (id, username, password, email) VALUES (?, ?, ?, ?)',
+        args: ['user_admin', 'admin', adminHashed, 'rajaricetraders01@gmail.com']
       });
 
       // Email admin
       await db.execute({
-        sql: 'INSERT INTO users (id, username, password) VALUES (?, ?, ?)',
-        args: ['user_admin_gmail', 'rajaricetraders01@gmail.com', adminHashed]
+        sql: 'INSERT INTO users (id, username, password, email) VALUES (?, ?, ?, ?)',
+        args: ['user_admin_gmail', 'rajaricetraders01@gmail.com', adminHashed, 'rajaricetraders01@gmail.com']
       });
 
       console.log('✅ Default admin accounts created successfully.');

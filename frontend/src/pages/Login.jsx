@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Sprout, Lock, User, AlertCircle } from 'lucide-react';
 
@@ -79,13 +79,12 @@ const Login = () => {
           <div>
             <div className="flex justify-between items-center mb-1">
               <label className="block text-sm font-semibold text-gray-700">Password</label>
-              <button 
-                type="button" 
-                onClick={() => alert("Please contact the main administrator of Raja Rice Traders or visit the system manager to reset your password.")}
+              <Link 
+                to="/forgot-password"
                 className="text-xs text-[#2E7D32] hover:underline font-semibold"
               >
                 Forgot password?
-              </button>
+              </Link>
             </div>
             <div className="relative">
               <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-gray-400">

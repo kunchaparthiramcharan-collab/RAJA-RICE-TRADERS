@@ -178,4 +178,139 @@ router.post('/customer/login', async (req, res) => {
   }
 });
 
+const { sendOTP } = require('../config/emailService');
+
+// @route   POST /api/auth/forgot-password
+// @desc    Generate and send password reset OTP
+router.post('/forgot-password', async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ message: 'Please enter your registered email address' });
+  }
+
+  try {
+    const emailLower = email.toLowerCase();
+
+    // 1. Check if email belongs to a customer
+    const customerRes = await db.execute({
+      sql: 'SELECT * FROM customers WHERE LOWER(email) = ?',
+      args: [emailLower]
+    });
+
+    // 2. Check if email belongs to an admin user
+    const adminRes = await db.execute({
+      sql: 'SELECT * FROM users WHERE LOWER(email) = ?',
+      args: [emailLower]
+    });
+
+    const isCustomer = customerRes.rows.length > 0;
+    const isAdmin = adminRes.rows.length > 0;
+
+    if (!isCustomer && !isAdmin) {
+      return res.status(404).json({ message: 'This email is not registered with any account' });
+    }
+
+    // 3. Generate 6-digit numeric OTP
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 mins from now
+
+    // 4. Save to password_resets table (upsert behavior)
+    const resetId = 'reset_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+    
+    // First, clean up any existing reset codes for this email
+    await db.execute({
+      sql: 'DELETE FROM password_resets WHERE LOWER(email) = ?',
+      args: [emailLower]
+    });
+
+    await db.execute({
+      sql: 'INSERT INTO password_resets (id, email, code, expires_at) VALUES (?, ?, ?, ?)',
+      args: [resetId, emailLower, code, expiresAt]
+    });
+
+    // 5. Send Email
+    const emailRes = await sendOTP(emailLower, code);
+
+    return res.json({
+      message: 'Verification code sent to your email address.',
+      mock: emailRes.mock ? true : false
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error while requesting password reset' });
+  }
+});
+
+// @route   POST /api/auth/reset-password
+// @desc    Verify OTP and reset password
+router.post('/reset-password', async (req, res) => {
+  const { email, code, newPassword } = req.body;
+
+  if (!email || !code || !newPassword) {
+    return res.status(400).json({ message: 'Please enter all fields (email, code, and new password)' });
+  }
+
+  if (newPassword.length < 6) {
+    return res.status(400).json({ message: 'Password must be at least 6 characters long' });
+  }
+
+  try {
+    const emailLower = email.toLowerCase();
+
+    // 1. Verify OTP code in password_resets
+    const resetRes = await db.execute({
+      sql: 'SELECT * FROM password_resets WHERE LOWER(email) = ? AND code = ?',
+      args: [emailLower, code.trim()]
+    });
+
+    const resetRecord = resetRes.rows[0];
+
+    if (!resetRecord) {
+      return res.status(400).json({ message: 'Invalid verification code' });
+    }
+
+    // 2. Check expiration
+    const expiresAt = new Date(resetRecord.expires_at);
+    if (expiresAt < new Date()) {
+      // Clean up expired record
+      await db.execute({
+        sql: 'DELETE FROM password_resets WHERE id = ?',
+        args: [resetRecord.id]
+      });
+      return res.status(400).json({ message: 'Verification code has expired. Please request a new one.' });
+    }
+
+    // 3. Hash new password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    // 4. Update password in the database (checks both tables)
+    // Update Customer
+    await db.execute({
+      sql: 'UPDATE customers SET password = ?, updated_at = CURRENT_TIMESTAMP WHERE LOWER(email) = ?',
+      args: [hashedPassword, emailLower]
+    });
+
+    // Update Admin
+    await db.execute({
+      sql: 'UPDATE users SET password = ?, updated_at = CURRENT_TIMESTAMP WHERE LOWER(email) = ?',
+      args: [hashedPassword, emailLower]
+    });
+
+    // 5. Clean up reset record
+    await db.execute({
+      sql: 'DELETE FROM password_resets WHERE LOWER(email) = ?',
+      args: [emailLower]
+    });
+
+    return res.json({ message: 'Password reset successfully. You can now login with your new password.' });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error while resetting password' });
+  }
+});
+
 module.exports = router;

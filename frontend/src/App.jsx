@@ -20,6 +20,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import CustomerLogin from './pages/CustomerLogin';
 import CustomerRegister from './pages/CustomerRegister';
 import CustomerDashboard from './pages/CustomerDashboard';
+import ForgotPassword from './pages/ForgotPassword';
 
 // Admin Route Protection
 const ProtectedRoute = ({ children }) => {
@@ -69,6 +70,7 @@ function AppContent() {
           {/* Customer Auth Pages */}
           <Route path="/customer-login" element={<CustomerLogin />} />
           <Route path="/customer-register" element={<CustomerRegister />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
           
           {/* Protected Customer Dashboard */}
           <Route 

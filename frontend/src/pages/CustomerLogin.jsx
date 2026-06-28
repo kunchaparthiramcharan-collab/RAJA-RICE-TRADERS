@@ -80,13 +80,12 @@ const CustomerLogin = () => {
           <div>
             <div className="flex justify-between items-center mb-1">
               <label className="block text-xs font-semibold text-gray-700">Password</label>
-              <button 
-                type="button" 
-                onClick={() => alert("Please contact support at support@rajaricetraders.com or visit the system manager to reset your password.")}
+              <Link 
+                to="/forgot-password"
                 className="text-[10px] text-[#2E7D32] hover:underline font-semibold"
               >
                 Forgot password?
-              </button>
+              </Link>
             </div>
             <div className="relative">
               <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-gray-400">
