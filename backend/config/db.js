@@ -45,9 +45,9 @@ const connectDB = async () => {
         description TEXT NOT NULL,
         category TEXT NOT NULL,
         price REAL NOT NULL,
-        packageSizes TEXT NOT NULL, -- Stored as JSON string, e.g. '["25kg","50kg"]'
+        packageSizes TEXT NOT NULL,
         imageUrl TEXT NOT NULL,
-        inStock INTEGER DEFAULT 1,  -- 0 for false, 1 for true
+        inStock INTEGER DEFAULT 1,
         stockQuantity INTEGER DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -60,7 +60,7 @@ const connectDB = async () => {
         customerName TEXT NOT NULL,
         customerPhone TEXT NOT NULL,
         customerEmail TEXT NOT NULL,
-        products TEXT NOT NULL,      -- Stored as JSON string, e.g. '[{"name":"BPT Rice","size":"50kg","quantity":2}]'
+        products TEXT NOT NULL,
         status TEXT DEFAULT 'Pending',
         message TEXT DEFAULT '',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
