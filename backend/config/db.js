@@ -2,7 +2,8 @@ const { createClient } = require('@libsql/client');
 const bcrypt = require('bcryptjs');
 
 // Read environment variables
-const url = process.env.TURSO_CONNECTION_URL || 'file:local.db';
+const isVercel = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
+const url = process.env.TURSO_CONNECTION_URL || (isVercel ? 'file:/tmp/local.db' : 'file:local.db');
 const authToken = process.env.TURSO_AUTH_TOKEN || '';
 
 console.log(`🔌 Database Connection URL: ${url}`);
