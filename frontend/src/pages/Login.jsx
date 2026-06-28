@@ -77,7 +77,16 @@ const Login = () => {
 
           {/* Password */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Password</label>
+            <div className="flex justify-between items-center mb-1">
+              <label className="block text-sm font-semibold text-gray-700">Password</label>
+              <button 
+                type="button" 
+                onClick={() => alert("Please contact the main administrator of Raja Rice Traders or visit the system manager to reset your password.")}
+                className="text-xs text-[#2E7D32] hover:underline font-semibold"
+              >
+                Forgot password?
+              </button>
+            </div>
             <div className="relative">
               <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-gray-400">
                 <Lock className="h-4 w-4" />
@@ -102,11 +111,6 @@ const Login = () => {
             {loading ? 'Authenticating...' : 'Sign In'}
           </button>
         </form>
-        
-        {/* Support hint */}
-        <p className="text-center text-xs text-gray-400 mt-6 leading-relaxed">
-          Default development credentials: <span className="font-semibold text-gray-500">admin</span> / <span className="font-semibold text-gray-500">admin123</span>
-        </p>
       </div>
     </div>
   );

@@ -78,7 +78,16 @@ const CustomerLogin = () => {
 
           {/* Password */}
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">Password</label>
+            <div className="flex justify-between items-center mb-1">
+              <label className="block text-xs font-semibold text-gray-700">Password</label>
+              <button 
+                type="button" 
+                onClick={() => alert("Please contact support at support@rajaricetraders.com or visit the system manager to reset your password.")}
+                className="text-[10px] text-[#2E7D32] hover:underline font-semibold"
+              >
+                Forgot password?
+              </button>
+            </div>
             <div className="relative">
               <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-gray-400">
                 <Lock className="h-4 w-4" />
@@ -111,9 +120,6 @@ const CustomerLogin = () => {
             <Link to="/customer-register" className="text-[#2E7D32] hover:underline font-bold inline-flex items-center gap-0.5">
               Create Account <ArrowRight className="h-3 w-3" />
             </Link>
-          </p>
-          <p className="text-gray-400 italic">
-            Default credentials: <span className="font-semibold text-gray-500">customer@example.com</span> / <span className="font-semibold text-gray-500">password123</span>
           </p>
           <div className="pt-2">
             <Link to="/login" className="text-xs text-gray-400 hover:text-[#2E7D32] font-semibold underline">
