@@ -1,5 +1,6 @@
 const { createClient } = require('@libsql/client');
 const bcrypt = require('bcryptjs');
+// Build: 2026-06-28T18:21
 
 // Read environment variables
 const isVercel = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
