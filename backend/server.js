@@ -8,8 +8,14 @@ dotenv.config();
 
 const app = express();
 
-// Connect to Database
-connectDB();
+// Connect to Database (async, non-blocking startup)
+(async () => {
+  try {
+    await connectDB();
+  } catch (err) {
+    console.error('❌ Database connection failed on startup:', err.message);
+  }
+})();
 
 // Middlewares
 app.use(cors());

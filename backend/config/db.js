@@ -203,7 +203,7 @@ const connectDB = async () => {
     }
   } catch (error) {
     console.error('❌ Database initialization error:', error.message);
-    process.exit(1);
+    // Do not call process.exit(1) — this would crash the Vercel serverless function
   }
 };
 
